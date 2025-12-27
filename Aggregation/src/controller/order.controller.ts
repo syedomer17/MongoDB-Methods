@@ -4,7 +4,8 @@ import { Order } from "../models/Order";
  * CREATE ORDER
  */
 export const createOrder = async (req: Request, res: Response) => {
-  const order = await Order.create(req.body);
+  const {userId, amount, status, items} = req.body;
+  const order = await Order.create({userId, amount, status, items});
   res.status(201).json(order);
 };
 
@@ -44,3 +45,43 @@ export const deleteOrder = async (req: Request, res: Response) => {
   await Order.findByIdAndDelete(req.params.id);
   res.json({ message: "Order deleted successfully" });
 };
+
+//the best arraregation that I have ever done
+export const result = async (req: Request, res: Response) => {
+  try {
+    const myresult = await Order.aggregate([
+    {
+      $match: { status: "completed" }
+    },
+    {
+      $group: {
+        _id: "$userId",
+        totalSpent: {$sum: "$amount"},
+        orders: {$sum: 1}
+      }
+    },{
+      $lookup: {
+        from: "users",
+        localField: "_id",
+        foreignField: "_id",
+        as: "user"
+      }
+    },
+    {
+      $unwind: "$user"
+    },
+    {
+      $project: {
+        _id: 0,
+        userName: "$user.name",
+        email: "$user.email",
+        totalSpent: 1,
+        orders: 1
+      }
+    }
+  ]);
+    res.json(myresult);
+  } catch (error) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+} 
